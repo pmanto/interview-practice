@@ -1,4 +1,4 @@
-import { useDeferredValue, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import type { User } from "../types/User";
 import TableRow from "./TableRow";
 import Paginatior from "./Paginator";
@@ -11,14 +11,18 @@ interface DataTableProps {
 
 const totalUsersPerPage = 10;
 
+const columns: { property: keyof User; label: string }[] = [
+    { property: "name", label: "Name" },
+    { property: "email", label: "Email" },
+    { property: "role", label: "Role" },
+    { property: "createdAt", label: "Created At" },
+];
+
 export default function DataTable({ users }: DataTableProps) {
     const [sortProperty, setSortProperty] = useState<keyof User>("name");
     const [ascendingOrder, setAscendingOrder] = useState<boolean>(true);
     const [currentPage, setCurrentPage] = useState<number>(1);
     const [filterBy, setFilterBy] = useState<string>("");
-
-    // Let React keep the input responsive while filtering catches up in the background
-    const deferredFilterBy = useDeferredValue(filterBy);
 
     // Lowercase each name once per data change, not on every keystroke
     const searchIndex = useMemo(
@@ -27,12 +31,12 @@ export default function DataTable({ users }: DataTableProps) {
     );
 
     const filteredUsers = useMemo(() => {
-        const query = deferredFilterBy.toLowerCase();
+        const query = filterBy.toLowerCase();
         if(query === ""){
             return users;
         }
         return searchIndex.filter((entry) => entry.key.includes(query)).map((entry) => entry.user);
-    }, [users, searchIndex, deferredFilterBy]);
+    }, [users, searchIndex, filterBy]);
 
     // Sort only when the data or sort settings change - currentPage is not a dependency
     const sortedUsers = useMemo(() => {
@@ -67,20 +71,42 @@ export default function DataTable({ users }: DataTableProps) {
     
     return (
         <div className="table-container">
-        <h2>Users</h2>
+        <h2 id="users-heading">Users</h2>
         <SearchBox onSearch={handleSearch}/>
-        <table>
+        <p className="visually-hidden" role="status">
+            {sortedUsers.length.toLocaleString()} {sortedUsers.length === 1 ? "user" : "users"} found
+        </p>
+        <table aria-labelledby="users-heading">
             <thead>
             <tr>
-                <th className="sortable" onClick={() => handleClick("name")}>Name</th>
-                <th className="sortable" onClick={() => handleClick("email")}>Email</th>
-                <th className="sortable" onClick={() => handleClick("role")}>Role</th>
-                <th className="sortable" onClick={() => handleClick("createdAt")}>Created At</th>
+                {columns.map(({ property, label }) => {
+                    const isSorted = property === sortProperty;
+                    return (
+                        <th
+                            key={property}
+                            scope="col"
+                            aria-sort={isSorted ? (ascendingOrder ? "ascending" : "descending") : "none"}
+                        >
+                            <button type="button" className="sort-button" onClick={() => handleClick(property)}>
+                                {label}
+                                <span className="sort-indicator" aria-hidden="true">
+                                    {isSorted ? (ascendingOrder ? "▲" : "▼") : ""}
+                                </span>
+                            </button>
+                        </th>
+                    );
+                })}
             </tr>
             </thead>
 
             <tbody>
-            {pageUsers.map((user) => ( <TableRow key={user.id} user={user} />))}
+            {pageUsers.length === 0 ? (
+                <tr>
+                    <td colSpan={columns.length} className="empty-state">No users found</td>
+                </tr>
+            ) : (
+                pageUsers.map((user) => ( <TableRow key={user.id} user={user} />))
+            )}
             </tbody>
         </table>
 

@@ -18,10 +18,10 @@ export default function Paginatior({currentPage, totalPages, onPageChange}:Pagin
     }
 
     return (
-        <div className="pagination">
-            <button onClick={handlePrevious}>Previous</button>
-            <span>Page {currentPage} of {totalPages}</span>
-            <button onClick={handleNext}>Next</button>
-        </div>
+        <nav className="pagination" aria-label="Pagination">
+            <button type="button" onClick={handlePrevious} disabled={currentPage <= 1}>Previous</button>
+            <span aria-live="polite">Page {currentPage} of {totalPages}</span>
+            <button type="button" onClick={handleNext} disabled={currentPage >= totalPages}>Next</button>
+        </nav>
     );
 }
