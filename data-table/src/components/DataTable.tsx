@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useDeferredValue, useMemo, useState } from "react";
 import type { User } from "../types/User";
 import TableRow from "./TableRow";
 import Paginatior from "./Paginator";
@@ -9,35 +9,45 @@ interface DataTableProps {
   users: User[];
 }
 
+const totalUsersPerPage = 10;
+
 export default function DataTable({ users }: DataTableProps) {
     const [sortProperty, setSortProperty] = useState<keyof User>("name");
     const [ascendingOrder, setAscendingOrder] = useState<boolean>(true);
     const [currentPage, setCurrentPage] = useState<number>(1);
     const [filterBy, setFilterBy] = useState<string>("");
-    const totalUsersPerPage = 3;
+
+    // Let React keep the input responsive while filtering catches up in the background
+    const deferredFilterBy = useDeferredValue(filterBy);
+
+    // Lowercase each name once per data change, not on every keystroke
+    const searchIndex = useMemo(
+        () => users.map((user) => ({ user, key: user.name.toLowerCase() })),
+        [users]
+    );
 
     const filteredUsers = useMemo(() => {
-        if(filterBy === ""){
+        const query = deferredFilterBy.toLowerCase();
+        if(query === ""){
             return users;
         }
+        return searchIndex.filter((entry) => entry.key.includes(query)).map((entry) => entry.user);
+    }, [users, searchIndex, deferredFilterBy]);
 
-        return users.filter((user) => user.name.toLowerCase().includes(filterBy.toLowerCase()));
-    }, [users, filterBy]);
-    
-    const totalPages = Math.ceil(filteredUsers.length / totalUsersPerPage); // Assuming 10 users per page
+    // Sort only when the data or sort settings change - currentPage is not a dependency
     const sortedUsers = useMemo(() => {
+        const direction = ascendingOrder ? 1 : -1;
         return [...filteredUsers].sort((a, b) => {
-            if(ascendingOrder){
-                if (a[sortProperty] < b[sortProperty]) return -1;
-                if (a[sortProperty] > b[sortProperty]) return 1;
-                return 0;
-            } else {
-                if (a[sortProperty] > b[sortProperty]) return -1;
-                if (a[sortProperty] < b[sortProperty]) return 1;
-                return 0;
-            }
-        }).slice((currentPage - 1) * totalUsersPerPage, Math.min(currentPage * totalUsersPerPage, filteredUsers.length));
-    }, [filteredUsers, sortProperty, ascendingOrder, currentPage]);
+            if (a[sortProperty] < b[sortProperty]) return -direction;
+            if (a[sortProperty] > b[sortProperty]) return direction;
+            return 0;
+        });
+    }, [filteredUsers, sortProperty, ascendingOrder]);
+
+    const totalPages = Math.max(1, Math.ceil(sortedUsers.length / totalUsersPerPage));
+    const page = Math.min(currentPage, totalPages);
+    // Slicing 10 rows is cheap, no memo needed
+    const pageUsers = sortedUsers.slice((page - 1) * totalUsersPerPage, page * totalUsersPerPage);
 
     function handleClick(property: keyof User) {
         if(property === sortProperty){
@@ -47,6 +57,7 @@ export default function DataTable({ users }: DataTableProps) {
         }
 
         setSortProperty(property)
+        setCurrentPage(1); // Reset to first page on new sort
     }
 
     function handleSearch(filterBy: string) {
@@ -69,11 +80,11 @@ export default function DataTable({ users }: DataTableProps) {
             </thead>
 
             <tbody>
-            {sortedUsers.map((user) => ( <TableRow user={user} />))}
+            {pageUsers.map((user) => ( <TableRow key={user.id} user={user} />))}
             </tbody>
         </table>
 
-        <Paginatior currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />        
+        <Paginatior currentPage={page} totalPages={totalPages} onPageChange={setCurrentPage} />        
         </div>
     );
 }

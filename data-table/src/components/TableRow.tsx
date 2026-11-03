@@ -1,10 +1,11 @@
+import { memo } from "react";
 import type { User } from "../types/User";
 
 interface TableRowProps {
   user: User;
 }
 
-export default function TableRow({user}:TableRowProps) {
+function TableRow({user}:TableRowProps) {
     return (
         <tr>
             <td>{user.name}</td>
@@ -14,3 +15,6 @@ export default function TableRow({user}:TableRowProps) {
         </tr>
     )
 }
+
+// Skip re-rendering rows whose user object hasn't changed
+export default memo(TableRow);
